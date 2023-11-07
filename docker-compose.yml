@@ -1,0 +1,97 @@
+version: '3'
+services:
+  challange_mysql:
+    image: mysql:8.0
+    container_name: challange_mysql
+    hostname: challange_mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=1234
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=wordpress
+      - MYSQL_PASSWORD=wordpress
+    volumes:
+      - ./db-data:/var/lib/mysql
+    command: '--default-authentication-plugin=mysql_native_password'
+    networks:
+      customnetwork:
+        ipv4_address: 172.22.1.28
+  challange_wordpress:
+    container_name: challange_wordpress
+    hostname: challange_wordpress
+    depends_on:
+     - challange_mysql
+    image: wordpress:5.9-php8.1-fpm-alpine
+    restart: always
+    environment:
+     - WORDPRESS_DB_HOST=challange_mysql:3306
+     - WORDPRESS_DB_USER=wordpress
+     - WORDPRESS_DB_PASSWORD=wordpress
+     - WORDPRESS_DB_NAME=wordpress
+    volumes:
+     - ./wordpress:/var/www/html/wordpress
+    networks:
+      customnetwork:
+        ipv4_address: 172.22.1.29
+  challange_nginx:
+    container_name: challange_nginx
+    image: nginx:alpine
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./wordpress:/var/www/html/wordpress
+      - ./symfony:/var/www/html/symfony
+    depends_on:
+      - challange_wordpress
+    networks:
+      customnetwork:
+        ipv4_address: 172.22.1.30
+  challange_symfony:
+    container_name: challange_symfony
+    hostname: challange_symfony
+    image: symfony:6
+    restart: always
+    volumes:
+      - ./symfony:/var/www/html/symfony
+    ports:
+      - 9001:9000
+    networks:
+      customnetwork:
+        ipv4_address: 172.22.1.31
+  challange_dnsmasq:
+    container_name: challange_dnsmasq
+    restart: always
+    image: strm/dnsmasq
+    volumes:
+      - ./dnsmasq/dnsmasq.conf:/etc/dnsmasq.conf
+    cap_add:
+      - NET_ADMIN
+    networks:
+      customnetwork:
+        ipv4_address: 172.22.1.32
+  challange_haproxy:
+    container_name: challange_haproxy
+    image: haproxy:2.4-alpine
+    restart: always
+    volumes:
+      - ./haproxy/errors:/usr/local/etc/haproxy/errors
+      - ./haproxy:/usr/local/etc/haproxy/
+      - ./haproxy/ssl/challange:/etc/ssl/certs/challange
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      customnetwork:
+        ipv4_address: 172.22.1.33
+  challange_redis:
+    container_name: challange_redis
+    image: redis:alpine
+    restart: always
+    volumes:
+      - ./redis:/data
+networks:
+  customnetwork:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.1.0/16
